@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__Netlify",
+      "mcp__claude_ai_Netlify",
+      "Bash(netlify:*)",
+      "Bash(npx netlify:*)",
+      "Bash(ntl:*)"
+    ]
+  }
+}
