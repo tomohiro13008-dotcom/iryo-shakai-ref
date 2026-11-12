@@ -1,0 +1,8 @@
+# Netlifyのクレジットを守る設定（2026-11-11）
+# - 本番デプロイは1回15クレジット。無料枠300/月を使い切ると、全サイトが止まる
+# - コミットメッセージに [deploy] を含むときだけビルドする。それ以外のpushはスキップ
+# - ビルドはしない。公開するのは dist/ だけ（docs/ や source/ は出さない）
+[build]
+  publish = "dist"
+  command = ""
+  ignore = '''! git log -1 --pretty=%B | grep -qF "[deploy]"'''

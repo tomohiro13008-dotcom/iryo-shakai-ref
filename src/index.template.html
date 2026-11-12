@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>医療と社会のレファレンス</title>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へ</a>
+<div class="shell">
+  <aside class="side" id="side" aria-label="棚と道具">
+    <div class="side-brand">
+      <a class="side-title" href="#home">医療と社会のレファレンス</a>
+      <p class="side-sub">7つの棚・個人用 v0</p>
+    </div>
+    <nav class="side-nav" id="side-nav" aria-label="左メニュー"></nav>
+  </aside>
+  <div class="main-col">
+    <header class="top">
+      <button type="button" class="menu-btn" id="menu-btn" aria-controls="side" aria-expanded="false">メニュー</button>
+      <p class="crumb" id="crumb"></p>
+      <form class="search" role="search" id="search-form">
+        <label class="sr" for="q">棚・単元・用語・問いを探す</label>
+        <input id="q" type="search" placeholder="言葉で探す（例：繰出、包括期、特定健診）" autocomplete="off">
+      </form>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="foot" id="foot"></footer>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script type="application/json" id="units-data">__UNITS_JSON__</script>
+<script type="application/json" id="shelves-data">__SHELVES_JSON__</script>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>
