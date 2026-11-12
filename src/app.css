@@ -256,6 +256,12 @@ details.qa > div { padding: 0 14px 14px; display: grid; gap: 10px; }
 .hit b { color: var(--link); }
 .hit small { font-size: .875rem; color: var(--ink-soft); }
 mark { background: #fff0a8; color: inherit; padding-inline: 1px; }
+/* 検索で飛んだ行：当たった言葉に印、行を2秒ほど光らせる（動きを減らす設定では光らせず淡い地だけ） */
+mark.found { outline: 2px solid var(--draft-line); outline-offset: 0; border-radius: 2px; }
+.flash { animation: flash 2.4s ease-out; }
+tr.flash > * { animation: flash 2.4s ease-out; }
+@keyframes flash { from { background-color: #fff0a8; } to { background-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .flash, tr.flash > * { animation: none; background-color: #fff8db; } }
 .cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .cardlink { display: grid; gap: 4px; padding: 14px; background: var(--paper); border: 1px solid var(--ink-faint); border-radius: 6px; text-decoration: none; color: var(--ink); }
 .cardlink:visited { color: var(--ink); }

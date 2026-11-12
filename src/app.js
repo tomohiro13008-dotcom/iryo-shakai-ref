@@ -621,53 +621,126 @@ function viewNote() {
   });
 }
 
-/* ---------- 検索（棚・単元・用語・問い・制約カード・暦を横断） ---------- */
+/* ---------- 検索（棚・単元・用語・問い・制約カード・暦を横断）。当たりは1行ずつ出し、押すとその行まで飛んで光らせる ---------- */
 function buildIndex() {
   const idx = [];
-  const flat = blocks => (blocks || []).flatMap(b => b.kind === "table" ? [...b.columns, ...b.rows.flat()] : b.kind === "para" ? [b.text] : b.kind === "head" ? [b.text, b.inline || ""] : (b.items || []));
+  const head = (kind, title, href) => idx.push({ kind, title, href, text: "", line: "", head: true });
+  const line = (kind, title, href, t) => { if (t && String(t).trim()) idx.push({ kind, title, href, text: plain(t), line: String(t) }); };
+  const blockLines = blocks => (blocks || []).flatMap(b => b.kind === "table" ? b.rows.map(r => r.join(" ")) : b.kind === "para" ? [b.text] : b.kind === "head" ? [b.text, b.inline || ""] : (b.items || []));
   S.shelves.forEach(s => {
     const t = `棚${s.no} ${s.name}`;
-    const add = (id, name, parts) => idx.push({ kind: "棚", title: `${t} › ${name}`, text: parts.filter(Boolean).map(plain).join(" "), href: `#s${s.no}:${id}` });
-    add("sum", "一言で", [s.summary, s.status_text]);
-    add("fig", "一枚図", [s.figure.plan]);
-    add("num", "押さえる数字", [...s.numbers.columns, ...s.numbers.rows.flat(), ...flat(s.numbers.after)]);
-    add("ov", "全体像", s.overview.flatMap(x => [x.title, x.text, ...flat(x.blocks)]));
-    add("cal", "暦", [s.calendar.title, ...s.calendar.rows.flat(), ...flat(s.calendar.after)]);
-    add("neg", "会議・交渉で使う", s.negotiation);
-    add("mis", "よくある誤解", s.misconceptions);
-    add("local", "自分の現場で確かめること", s.local_checks.flatMap(c => [c.what, c.where]));
-    (s.topics || []).forEach((tp, i) => add(`t${i}`, tp.title, [tp.title, tp.summary, ...flat(tp.blocks)]));
-    add("down", "降り先", [s.down_text]);
-    add("src", "照合に使った資料", [s.sources_text]);
+    const sec = (id, name, lines) => { const href = `#s${s.no}:${id}`; head("棚", `${t} › ${name}`, href); lines.forEach(x => line("棚", `${t} › ${name}`, href, x)); };
+    head("棚", t, `#s${s.no}`);
+    line("棚", `${t} › 状態`, `#s${s.no}`, s.status_text);
+    sec("sum", "一言で", [s.summary]);
+    sec("fig", "一枚図", [s.figure.plan]);
+    sec("num", "押さえる数字", [...s.numbers.rows.map(r => r.join(" ")), ...blockLines(s.numbers.after)]);
+    sec("ov", "全体像", s.overview.flatMap(x => [x.title.split("：")[1] || "", x.text, ...blockLines(x.blocks)]));
+    sec("cal", "暦", [...s.calendar.rows.map(r => r.join(" ")), ...blockLines(s.calendar.after)]);
+    sec("neg", "会議・交渉で使う", s.negotiation);
+    sec("mis", "よくある誤解", s.misconceptions);
+    sec("local", "自分の現場で確かめること", s.local_checks.flatMap(c => [c.what, c.where]));
+    (s.topics || []).forEach((tp, i) => sec(`t${i}`, tp.title, [tp.summary, ...blockLines(tp.blocks)]));
+    sec("down", "降り先", [s.down_text]);
+    sec("src", "この棚の照合に使った資料", [s.sources_text]);
   });
   const c = S.guide.calendar;
-  idx.push({ kind: "暦", title: `棚をまたぐ暦 › ${c.year.title}`, text: c.year.rows.flat().map(plain).join(" "), href: "#cal" });
-  idx.push({ kind: "暦", title: `棚をまたぐ暦 › ${c.multi.title}`, text: c.multi.rows.flat().map(plain).join(" "), href: "#cal" });
-  S.guide.sections.filter(x => x.title !== "棚をまたぐ暦").forEach(x => idx.push({ kind: "記録", title: `使い方と照合の記録 › ${x.title}`, text: flat(x.blocks).map(plain).join(" "), href: "#about" }));
+  [["year", c.year], ["multi", c.multi]].forEach(([id, tb]) => { head("暦", `棚をまたぐ暦 › ${tb.title}`, "#cal:" + id); tb.rows.forEach(r => line("暦", `棚をまたぐ暦 › ${tb.title}`, "#cal:" + id, r.join(" "))); });
+  S.guide.sections.filter(x => x.title !== "棚をまたぐ暦").forEach(x => { head("記録", `使い方と照合の記録 › ${x.title}`, "#about"); blockLines(x.blocks).forEach(t => line("記録", `使い方と照合の記録 › ${x.title}`, "#about", t)); });
   D.units.forEach(u => {
-    const it = u.items;
-    const body = [it.summary.text, ...it.mechanism.flows.flatMap(f => [f.who, f.to, f.what, f.note]), ...it.mechanism.notes, ...it.timeline.rows.flatMap(r => [r.when, r.event]), ...it.field_limits.points, it.perspectives.medical, it.perspectives.admin, it.perspectives.welfare, ...it.misconceptions.flatMap(m => [m.myth, m.fact]), ...it.terms.flatMap(t => [t.medical, t.admin, t.meaning]), ...it.local_checks.flatMap(c => [c.what, c.where]), ...it.self_check.flatMap(c => [c.question, c.answer])].map(plain).join(" ");
-    idx.push({ kind: "単元", title: `単元${u.unit} ${u.title}`, text: body, href: `#u${u.unit}` });
+    const it = u.items, t = `単元${u.unit} ${u.title}`;
+    const sec = (i, lines) => { const href = `#u${u.unit}:i${i}`; lines.forEach(x => line("単元", `${t} › ${ITEM_NAMES[i - 1]}`, href, x)); };
+    head("単元", t, `#u${u.unit}`);
+    sec(1, [it.summary.text]);
+    sec(2, [...it.mechanism.flows.map(f => [f.who, f.what, f.to, f.note].filter(Boolean).join(" ")), ...it.mechanism.notes]);
+    sec(3, [...it.timeline.rows.map(r => [r.when, r.event, r.basis].join(" ")), ...it.timeline.notes]);
+    sec(4, it.field_limits.points);
+    sec(5, [it.perspectives.medical, it.perspectives.admin, it.perspectives.welfare]);
+    sec(6, it.misconceptions.map(m => m.myth + " " + m.fact));
+    sec(7, it.terms.map(x => [x.medical, x.admin, x.meaning].join(" ")));
+    sec(8, it.sources.map(x => x.text));
+    sec(9, it.local_checks.flatMap(x => [x.what, x.where]));
+    sec(10, it.self_check.flatMap(x => [x.question, x.answer]));
   });
-  (D.questions || []).forEach(q => idx.push({ kind: "問い", title: q.q, text: [q.answer, ...q.checks, ...q.ask].map(plain).join(" "), href: `#q-${q.id}` }));
-  (D.glossary || []).forEach(g => idx.push({ kind: "用語", title: g.term, text: [g.medical, g.admin, g.welfare, g.gap, g.common].map(plain).join(" "), href: "#terms" }));
-  (D.cards || []).forEach(cd => idx.push({ kind: "カード", title: cd.role, text: plain(cardText(cd)), href: `#card-${cd.id}` }));
+  (D.questions || []).forEach(q => { head("問い", q.q, `#q-${q.id}`); [q.answer, ...q.checks, ...q.ask].forEach(x => line("問い", q.q, `#q-${q.id}`, x)); });
+  (D.glossary || []).forEach(g => { head("用語", g.term, "#terms"); [g.medical, g.admin, g.welfare, g.gap, g.common].forEach(x => line("用語", g.term, "#terms", x)); });
+  (D.cards || []).forEach(cd => { head("カード", cd.role, `#card-${cd.id}`); [...cd.can, ...cd.cannot, ...cd.calendar, ...cd.procedure, cd.metrics, ...cd.bad, ...cd.good, cd.basis.join("、")].forEach(x => line("カード", cd.role, `#card-${cd.id}`, x)); });
   return idx;
 }
 let INDEX = null;
+const SEARCH_MAX = 80;
+let lastHits = [], lastQ = "", pendingFind = null;
 function excerpt(text, q) {
   const i = text.indexOf(q);
-  if (i < 0) return esc(text.slice(0, 70)) + "…";
-  const a = Math.max(0, i - 24), b = Math.min(text.length, i + q.length + 40);
+  if (i < 0) return esc(text.slice(0, 70)) + (text.length > 70 ? "…" : "");
+  const a = Math.max(0, i - 24), b = Math.min(text.length, i + q.length + 50);
   return (a > 0 ? "…" : "") + esc(text.slice(a, i)) + "<mark>" + esc(q) + "</mark>" + esc(text.slice(i + q.length, b)) + (b < text.length ? "…" : "");
 }
 function viewSearch(q) {
   INDEX = INDEX || buildIndex();
   setNav("", `「${esc(q)}」の検索`);
-  const hits = INDEX.map(e => ({ e, score: (e.title.includes(q) ? 2 : 0) + (e.text.includes(q) ? 1 : 0) })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  const heads = INDEX.filter(e => e.head && e.title.includes(q));
+  const lines = INDEX.filter(e => !e.head && e.text.includes(q));
+  const hits = heads.concat(lines);
+  lastHits = hits.slice(0, SEARCH_MAX); lastQ = q;
   main.innerHTML = `<section class="sec"><h1 class="sec-h" style="border-top:0;padding-top:0">「${esc(q)}」の検索結果（${hits.length}件）</h1>
-    <p class="small muted" aria-live="polite">${hits.length}件見つかりました。</p>
-    <div class="hits">${hits.map(({ e }) => `<a class="hit" href="${e.href}"><span><span class="tag basis">${e.kind}</span> <b>${esc(e.title)}</b></span><small>${excerpt(e.text, q)}</small></a>`).join("") || '<p class="hit muted">見つかりません。別の言い方を試すか、<a href="#terms">用語集</a>を見てください。</p>'}</div></section>`;
+    <p class="small muted" aria-live="polite">${hits.length}件見つかりました。${hits.length > SEARCH_MAX ? `先頭の${SEARCH_MAX}件を出しています。言葉を足して絞ってください。` : ""}押すと、その行まで飛んで光らせます。</p>
+    <div class="hits">${lastHits.map((e, i) => `<a class="hit" href="${e.href}" data-hit="${i}"><span><span class="tag basis">${e.kind}</span> <b>${esc(e.title)}</b></span>${e.head ? "" : `<small>${excerpt(e.text, q)}</small>`}</a>`).join("") || '<p class="hit muted">見つかりません。別の言い方を試すか、<a href="#terms">用語集</a>を見てください。</p>'}</div></section>`;
+  main.querySelectorAll("[data-hit]").forEach(a => a.addEventListener("click", ev => {
+    if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+    ev.preventDefault();
+    const e = lastHits[+a.dataset.hit];
+    pendingFind = e.head ? null : { q: lastQ, line: e.line };
+    if (location.hash === e.href) { qg.value = ""; current = ""; route(); }
+    else location.hash = e.href.slice(1);
+  }));
+}
+/* 見えている文字だけを、比べやすい形にそろえる（読み上げ用の文字・今月の札・印のボタンは除く） */
+const norm = s => plain(s).replace(/【要入力】/g, "").replace(/【(.+?)】/g, "$1").replace(/→/g, "").replace(/\s+/g, "");
+function textOf(el) {
+  let out = "";
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) { if (!n.parentElement.closest(".sr, .tag.now, .marks")) out += n.nodeValue; }
+  return out.replace(/\s+/g, "");
+}
+function markIn(el, q) {
+  /* 太字やリンクの境目をまたぐ言葉にも印を付ける（文字の並びをつないで探し、またいだ部分ごとに包む） */
+  const nodes = [];
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) { if (!n.parentElement.closest(".sr, .marks")) nodes.push(n); }
+  const all = nodes.map(n => n.nodeValue).join("");
+  const hits = [];
+  for (let i = all.indexOf(q); i >= 0; i = all.indexOf(q, i + q.length)) hits.push(i);
+  if (!hits.length) return;
+  const starts = []; let pos = 0;
+  nodes.forEach(n => { starts.push(pos); pos += n.nodeValue.length; });
+  for (let k = nodes.length - 1; k >= 0; k--) {
+    const n = nodes[k], s0 = starts[k], s1 = s0 + n.nodeValue.length;
+    const parts = hits.map(h => [Math.max(h, s0) - s0, Math.min(h + q.length, s1) - s0]).filter(([x, y]) => x < y).reverse();
+    parts.forEach(([x, y]) => {
+      const mid = n.splitText(x); mid.splitText(y - x);
+      const m = document.createElement("mark"); m.className = "found";
+      mid.parentNode.replaceChild(m, mid); m.appendChild(mid);
+    });
+  }
+}
+function findLine(q, lineText) {
+  const nq = norm(q), nl = norm(lineText), pre = nl.slice(0, 12);
+  const cands = [...main.querySelectorAll("p, li, tr, summary, h3, .flow, .three > div, .u-check label")]
+    .map(el => ({ el, t: textOf(el) })).filter(x => x.t.includes(nq));
+  if (!cands.length) return false;
+  const best = (cands.filter(x => x.t.includes(pre)).length ? cands.filter(x => x.t.includes(pre)) : cands).sort((a, b) => a.t.length - b.t.length)[0].el;
+  for (let d = best.closest("details"); d; d = d.parentElement && d.parentElement.closest("details")) d.open = true;
+  markIn(best, q);
+  best.classList.remove("flash"); void best.offsetWidth; best.classList.add("flash");
+  best.scrollIntoView({ block: "center" });
+  best.setAttribute("tabindex", "-1"); best.focus({ preventScroll: true });
+  return true;
+}
+function runFind() {
+  if (!pendingFind) return;
+  const p = pendingFind; pendingFind = null;
+  findLine(p.q, p.line);
 }
 
 /* ---------- 画面の切り替え ---------- */
@@ -679,12 +752,12 @@ let current = "";
 function route(initial) {
   const h = decodeURIComponent(location.hash.slice(1)) || "home";
   const [base, sec] = h.split(":");
-  if (base === current && sec) { jump("sec-" + sec); return; }
+  if (base === current && sec) { jump("sec-" + sec); runFind(); return; }
   current = base;
   let m;
   if ((m = base.match(/^s(\d)$/))) viewShelf(+m[1], sec);
   else if ((m = base.match(/^u(\d+)$/))) viewUnit(+m[1], sec);
-  else if ((m = base.match(/^q-(.+)$/))) { current = ""; viewQuestions(m[1]); return; }
+  else if ((m = base.match(/^q-(.+)$/))) { current = ""; viewQuestions(m[1]); markScrollTables(); runFind(); return; }
   else if ((m = base.match(/^card-(.+)$/))) viewCard(m[1]);
   else if (base === "cal") viewCal();
   else if (base === "about") viewAbout();
@@ -695,7 +768,9 @@ function route(initial) {
   else if (base === "note") viewNote();
   else { current = "home"; viewHome(); }
   markScrollTables();
-  if (!sec) { window.scrollTo(0, 0); if (!initial) main.focus({ preventScroll: true }); }
+  if (base === "cal" && sec) jump("sec-" + sec);
+  if (!sec && !pendingFind) { window.scrollTo(0, 0); if (!initial) main.focus({ preventScroll: true }); }
+  runFind();
 }
 function markScrollTables() {
   main.querySelectorAll(".tbl-wrap").forEach(w => {

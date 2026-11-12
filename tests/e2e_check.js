@@ -92,6 +92,36 @@ const ok = (name, pass, detail) => { results.push({ name, pass: !!pass, detail: 
   const kinds = await page.$$eval(".hit .tag", t => [...new Set(t.map(x => x.textContent))]);
   const nHits = await page.$$eval(".hit", x => x.length);
   ok("検索で棚・単元・用語・問いを横断して引ける", ["棚", "単元", "問い"].every(k => kinds.includes(k)), `「繰出」${nHits}件 種類：${kinds.join("・")}`);
+  // 当たった行まで飛ぶ：棚の数字の表の行（画面の下のほう）
+  const hitInfo = async () => page.evaluate(() => {
+    const f = document.querySelector(".flash"), m = document.querySelector("mark.found");
+    if (!f) return null;
+    const r = f.getBoundingClientRect();
+    return { tag: f.tagName, text: f.textContent.replace(/\s+/g, "").slice(0, 30), mark: m ? m.textContent : "", inView: r.top >= 0 && r.bottom <= innerHeight, hash: location.hash, q: document.getElementById("q").value, focused: document.activeElement === f };
+  });
+  await page.fill("#q", "7,517億円"); await page.waitForTimeout(60);
+  await page.click(".hit[data-hit] >> nth=0"); await page.waitForTimeout(60);
+  const j1 = await hitInfo();
+  ok("検索の当たりを押すと、その行まで飛んで光らせる（棚2の数字の表）", j1 && j1.tag === "TR" && j1.text.startsWith("公立病院への他会計繰入金") && j1.mark === "7,517億円" && j1.inView && j1.focused && j1.q === "", JSON.stringify(j1));
+  // 閉じた開閉の中（単元2の自己チェックの答え）は開いてから飛ぶ
+  await page.fill("#q", "繰出見込み額の合算"); await page.waitForTimeout(60);
+  const firstUnit = await page.$$eval(".hit[data-hit]", as => as.findIndex(a => a.getAttribute("href") === "#u2:i10"));
+  await page.click(`.hit[data-hit="${firstUnit}"]`); await page.waitForTimeout(60);
+  const j2 = await hitInfo();
+  const detOpen = await page.evaluate(() => { const f = document.querySelector(".flash"); return !!(f && f.closest("details") && f.closest("details").open); });
+  ok("閉じた開閉の中の行は、開いてから飛ぶ（単元2の自己チェック）", j2 && j2.inView && detOpen && j2.mark === "繰出見込み額の合算", JSON.stringify(j2));
+  // 今いる節と同じ行き先でも飛ぶ（ハッシュが変わらない場合）
+  await go("s2:num");
+  await page.fill("#q", "7,517億円"); await page.waitForTimeout(60);
+  await page.click(".hit[data-hit] >> nth=0"); await page.waitForTimeout(60);
+  const j3 = await hitInfo();
+  ok("今いる節と同じ行き先の当たりでも飛ぶ", j3 && j3.tag === "TR" && j3.inView, JSON.stringify(j3));
+  // キーボード（Tab で当たりへ、Enter で飛ぶ）
+  await page.fill("#q", "包括期"); await page.waitForTimeout(60);
+  await page.focus("#q"); await page.keyboard.press("Tab"); await page.keyboard.press("Enter"); await page.waitForTimeout(60);
+  const j4 = await hitInfo();
+  ok("キーボードだけでも当たりの行へ飛べる（「包括期」）", j4 && j4.inView && j4.mark === "包括期" && j4.focused, JSON.stringify(j4));
+  if (OUT) { await page.evaluate(() => { document.getElementById("toast").hidden = true; }); await page.screenshot({ path: path.join(OUT, "surface_search_jump.png") }); }
   await page.fill("#q", "");
   await go("terms");
   ok("用語集が出る", (await page.$$eval("#gl-list article", x => x.length)) === 10, "");
